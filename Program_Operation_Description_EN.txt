@@ -1,0 +1,23 @@
+= TECHNICAL DESCRIPTION OF THE ENGINE (SolidEdge DXF Extractor) =
+Authored by: Mateusz Gołębiewski (www.mateuszgolebiewski.pl)
+
+The application is a native desktop add-on written in .NET (C#) architecture, aimed at the seamless, mass extraction of sheet metal parts (PSM) residing in complex Solid Edge ASM assemblies.
+
+## MAIN WORKFLOW:
+1. **Environment Sandbox**: The application works as a separate process. To start a task, there is no need to pre-launch the engineering software. Using Microsoft COM technology, the program will invoke Solid Edge as a secure background server without consuming graphical system resources. The interface module also supports native Drag&Drop functionality of files and Windows Command Line arguments. You can simply throw an .asm file onto its shortcut to start working.
+2. **Recursive Subassembly Scanning**: From the main tree flow of .asm files, the internal "PartScanner" deeply scans multi-threaded, searching for .psm extensions. For all permitted formats, the code automatically maps and locates thickness reference keys ("Gage", "Material Thickness", etc.) and maps the physical material selection.
+3. **Extraction Decision**: After displaying the complete list in a DataGridView, the user selects the subassemblies to be exported, confirms the naming convention, and then authorizes the 'Export' procedure.
+
+## SAFEGUARD SYSTEMS (ENGINE):
+Solid Edge very often misprocesses the API in case the document is not fully prepared or has a rigid structure that throws junk onto the DXF map. Workarounds utilized in this application:
+
+### A) The Largest Area Face Calculation Algorithm (Fallback of the Fallback)
+Some sheet metal parts might not have a forced "FlatPattern" structure loaded. When the application encounters a zero value for "FlatPatternModels.Count", it doesn't give up. A module is then triggered that analyzes the entire 3D object of the sheet metal and mathematically checks the surface area for each of the sheet metal's faces. A fraction of a second after analyzing the vector of each face, the application orders the projection to be recalculated using the face located on the coordinate with the largest flat surface area, which guarantees Solid Edge's 100% indifference to the lack of pre-configuration by the user at the creation stage.
+
+### B) DXF "Entities" Cleaning Mechanics
+The export department by default forces the retention of bend axes, which clutter the panels of CNC cutting operators. The Extractor engine's code does not rely on the Solid Edge API here, but has been equipped with a brutal .dxf file stream parser.
+Right after the successful extraction of full geometry from the Solid Edge machine, the application without anyone's help loads this file into a stream and breaks it down into CODE/VALUE pairs.
+Next, if the tabular layout declares a code structure hit by phrases flagged as: "up", "down", "bend" or "centerlines" (e.g., `DOWN_CENTERLINES`), the object amputates such structures straight from the file, leaving an ideal, clean external contour for numerical cutting, and then overwrites the clean file on the disk.
+
+### C) DXF Content Validation Mechanics (Empty File Detection)
+Sometimes the file by name alone has corrupted or outdated baseline format geometry. Upon API routing, Solid Edge C++, instead of returning a fully-fledged COM Error, might decide to generate just a DXF header with no geometry, which is effectively of zero use. A robust method has been implemented in the engine that analyzes the physical presence of LINE, ARC, CIRCLE, and PLINE tags. This on-the-fly analysis catches any "empty projection" following a glitch and immediately discards it, ensuring that only files with actual geometry are kept.
